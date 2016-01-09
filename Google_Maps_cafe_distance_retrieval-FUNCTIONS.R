@@ -11,6 +11,7 @@
 # Distances = obtains the distances and duration of travel between the origins and destinations
 # Destinations = Obtains the names of the destinations 
 # TourDist = obtains the total distance for a given route
+# GetLatLong = geocodes addresses into lattitude and longitude coordinates
 
 
 
@@ -122,12 +123,14 @@ Distances <-  function(node, name="row"){
     #Extracting numbers from the start of a string:
     #See http://www.endmemo.com/program/R/gsub.php for syntax
     #I'm actually deleting everything that isn't a digit
-    dur[klp] = as.numeric(gsub("\\D","",unlist(datavec[klp][[1]]$children["duration"][[1]]$children$text)[3]))
+    #  OLDCODE: dur[klp] = as.numeric(gsub("\\D","",unlist(datavec[klp][[1]]$children["duration"][[1]]$children$text)[3]))
+    dur[klp] = as.numeric(unlist(datavec[klp][[1]]$children["duration"][[1]]$children$value)[3])
     # Note that the locations of the data entries are specific to digging within the googlemaps api output.  
-    number.no.comma = gsub(",",".",unlist(datavec[klp][[1]]$children["distance"][[1]]$children$text)[3])
-    dist[klp]  = as.numeric(gsub("[A-z]","",number.no.comma))    
+    #  OLDCODE: number.no.comma = gsub(",",".",unlist(datavec[klp][[1]]$children["distance"][[1]]$children$text)[3])
+    #  OLDCODE: dist[klp]  = as.numeric(gsub("[A-z]","",number.no.comma))    
+    dist[klp]  = as.numeric(unlist(datavec[klp][[1]]$children["distance"][[1]]$children$value)[3])
   }
-  return(cbind(minutes=dur,km = dist))
+  return(cbind(seconds=dur,metres = dist))
 }
 
 
@@ -188,106 +191,54 @@ TourDist <-  function(DistMatrix, tour){
 
 
 ########################################################
-##############  Tour2TravelMatrix
+##############  GetLatLong
 ########################################################
 
-Tour2TravelMatrix = function(tour){
-  # Transforms a tour permutation vector into a travel matrix
+GetLatLong <-  function(node, name="geometry"){
+  # Extracts the Latitude and longitude addresses from the googlemaps output.
+  # This gives a vector of addresses that can be used to name columns (or rows) 
+  # in the distance matrix
+  # If you already have the list of locations you don't need to use this function
   #
   ########
   # Last update: Dec 30, 2015, Dave Campbell
   # 
+  # This navigates the XML output from a call to the google maps API
+  # and extracts the addresses in teh destinations
   #
   # Use this function to: 
-  # Convert tour formats
+  # Given the google maps output, obtain the set of destinations that were used
   #
   # CALLED BY / WITHIN:
   # The Script: Google_Maps_cafe_distance_retrieval.R
   #==============================================================
   #                         REQUIRED INPUTS                      
   #==============================================================
+  # node = xmlTreeParse(page[[lp]], getDTD = F)[[1]]
+  #        This is the main body of the xml output.  Troubleshoot 
+  #        by making sure checking that names(node) actually contains
+  #        the appropriate target elements
+  # name="geometry" #should be generally left at the default 
   #
-  # tour = The permutation vector of locations visited
-  #
-  #===============================================================%
-  #                           OUTPUTS                             %
-  #===============================================================%
-  # A transition matrix
-  #===============================================================%
-  #                          MODEL DETAILS                        %
-  #===============================================================%
-  # 
-  # 
-  #===============================================================%
-  TravelMatrix = matrix(0,length(tour),length(tour))
-  TravelMatrix[tour[1],tour[2]] = 1
-  for(lp in 2:(length(tour)-1)){
-    TravelMatrix[tour[lp],tour[lp+1]] = 1
-  }
-}
-
-
-
-
-
-
-
-
-########################################################
-##############  TravelMatrix2Tour
-########################################################
-
-TravelMatrix2Tour = function(TravelMatrix){
-  # Transforms a travel matrix into a tour permutation vector
-  #
-  ########
-  # Last update: Dec 30, 2015, Dave Campbell
-  # 
-  #
-  # Use this function to: 
-  # Convert tour formats
-  #
-  # CALLED BY / WITHIN:
-  # The Script: Google_Maps_cafe_distance_retrieval.R
-  #==============================================================
-  #                         REQUIRED INPUTS                      
-  #==============================================================
-  #
-  # TravelMatrix = The transition travel matrix
   #
   #===============================================================%
   #                           OUTPUTS                             %
   #===============================================================%
-  # A permutation vector of locations visited
+  # just a vector of coordinates
   #===============================================================%
   #                          MODEL DETAILS                        %
   #===============================================================%
   # 
-  # 
+  # This code is specific to googlemaps api
   #===============================================================%
-  tour = rep(0,dim(TravelMatrix)[1])
-  TravelMatrix[tour[1],tour[2]] = 1
-  for(lp in 2:(length(tour)-1)){
-    TravelMatrix[tour[lp],tour[lp+1]] = 1
-  }
-}
-
-
-
-
-
-
-
-Indices = which(TravelMatrix==1,arr.ind = TRUE)
-SortedPath = rep(0,dim(TravelMatrix)[1])
-if(length(intersect(0:4,2:5)) == length(tour)){
-  #Symmetric path so it doesn't matter where it starts
-  SortedPath[1]=1
-  SortedPath[Indices[,"col"]]
-  SortedPath[Indices[,"col"]] = Indices[,"row"]
+  datavec = node$children[names(node)=="result"]
+  LOCATE = datavec[1][[1]]$children["geometry"][[1]]$children["location"]
   
+  Lat = as.numeric(unlist(LOCATE[[1]]["lat"])[3])
+  Lon = as.numeric(unlist(LOCATE[[1]]["lng"])[3])
+  #note that the third element is specific to extracting
+  # the address element from the googlemaps output.
+  return(c(lat = Lat,lon = Lon))
 }
 
 
-
-#TravelMatrix=matrix(c(0,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0),nrow=4)
